@@ -113,7 +113,6 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'check' => true,
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,

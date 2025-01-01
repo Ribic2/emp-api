@@ -16,7 +16,7 @@ class MovieResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'original_title' => $this->original_title,
+            'originalTitle' => $this->original_title,
             'year' => $this->year,
             'duration' => $this->duration,
             'description' => $this->description,
@@ -25,7 +25,7 @@ class MovieResource extends JsonResource
             'actors' => array_map('trim', explode(',', $this->actors)),
             'avg_vote' => $this->avg_vote,
             'votes' => $this->votes,
-            'comments' => $this->comments ?? null,
+            'comments' => CommentResource::collection($this->comments ?? []),
             'production_company' => $this->production_company ?? null,
             'genres_list' => array_map('trim', explode(',', $this->genres_list))
         ];

@@ -3,16 +3,42 @@
 namespace App\Http\Services;
 
 use App\Http\Resources\MovieResource;
-use App\Http\Resources\MoviesCollection;
-use App\Models\Movie;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use App\Http\Dtos\FilterDto;
 
 class MovieService
 {
 
-    public function getMovies(FilterDto $filter)
+
+    /**
+     * @param Collection $movies
+     * @return array
+     */
+    public function getFilters(Collection $movies): array
+    {
+
+        $uniqueGenres = $movies->pluck('genres_list')
+            ->map(function ($genres) {
+                return explode(',', $genres);
+            })
+            ->flatten()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        return [
+            'genres' => $uniqueGenres,
+        ];
+    }
+
+    /**
+     * @param FilterDto $filter
+     * @return Builder
+     */
+    public function getMovies(FilterDto $filter): Builder
     {
         $query = DB::table('movies')
             ->leftJoin('movie_genre', 'movie_genre.movie_id', '=', 'movies.id')
@@ -20,7 +46,7 @@ class MovieService
             ->leftJoin('production_companies', 'movies.production_company_id', '=', 'production_companies.id') // Join for production_company
             ->select(
                 'movies.*',
-                'production_companies.name as production_company', // Fetch production company name
+                'production_companies.name as production_company',
                 DB::raw('GROUP_CONCAT(DISTINCT genres.name ORDER BY genres.name SEPARATOR ",") as genres_list')
             )
             ->groupBy('movies.id');
@@ -30,13 +56,23 @@ class MovieService
         }
 
         if (!empty($filter->genres)) {
-            $query->whereIn('genres.name', $filter->genres);
+            $query->whereExists(function ($subquery) use ($filter) {
+                $subquery->select(DB::raw(1))
+                    ->from('movie_genre as mg_filter')
+                    ->join('genres as g_filter', 'mg_filter.genre_id', '=', 'g_filter.id')
+                    ->whereRaw('mg_filter.movie_id = movies.id')
+                    ->whereIn('g_filter.name', $filter->genres);
+            });
         }
 
-        return MovieResource::collection($query->paginate(10))->response()->getData();
+        return $query;
 
     }
 
+    /**
+     * @param int $id
+     * @return JsonResponse|mixed
+     */
     public function getMovie(int $id)
     {
         $query = DB::table('movies')
@@ -61,16 +97,19 @@ class MovieService
             return response()->json(['message' => 'Movie not found'], 404);
         }
 
-        // Split concatenated comments and commenters
-        $movie->comments = [];
+        $movie->comments = new Collection();
         if (!empty($movie->comments_list)) {
             $comments = explode('||', $movie->comments_list);
             $commenters = explode('||', $movie->commenters_list);
+            $index = 0;
             foreach ($comments as $key => $comment) {
-                $movie->comments[] = [
+                $movie->comments->add([
+                    'id' => $index,
                     'comment' => $comment,
-                    'user' => $commenters[$key] ?? 'Anonymous',
-                ];
+                    'user' => $commenters[$key] ?? 'Anonymous'
+                ]);
+
+                $index++;
             }
         }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Dtos\FilterDto;
+use App\Http\Resources\MovieResource;
 use App\Http\Services\MovieService;
 use App\Models\LikeAndFavourite;
 use App\Models\Movie;
@@ -18,33 +19,42 @@ class MovieController extends Controller
     {
     }
 
+
     /**
      * @param Request $request
      * @return JsonResponse
      */
     public function movies(Request $request): JsonResponse
     {
-        $movies = $this->movieService->getMovies(new FilterDto(
+        $filter = new FilterDto(
             $request->input('q'),
             $request->input('genres'),
             $request->input('rating'),
-        ));
+        );
+        $movies = $this->movieService->getMovies($filter);
+        $newFilters = $this->movieService->getFilters($movies->get());
 
-        return response()->json($movies);
+        return response()->json([
+            'data' => MovieResource::collection($movies->paginate(10)),
+            'filters' => [
+                'applied' => $filter,
+                'available' => $newFilters,
+            ],
+        ]);
     }
 
-    public function movie(Request $request, int $id): JsonResponse
+    public function movie(int $id): JsonResponse
     {
         $movie = $this->movieService->getMovie($id);
         return response()->json($movie);
     }
 
-    public function like($id): JsonResponse
+    public function like(int $id): JsonResponse
     {
         return $this->toggleAction($id, 'like');
     }
 
-    public function favourite($id): JsonResponse
+    public function favourite(int $id): JsonResponse
     {
         return $this->toggleAction($id, 'favourite');
     }

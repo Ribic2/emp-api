@@ -25,7 +25,6 @@ class CommentController extends Controller
         $comment->user_id = auth()->id();
         $comment->save();
 
-
         return response()->json($comment);
     }
 }

@@ -32,4 +32,11 @@ class Movie extends Model
     {
         return $this->hasMany(Comment::class);
     }
+
+    public function likedMovies()
+    {
+        return $this->belongsToMany(
+            Movie::class, Like::class, 'id', 'id'
+        );
+    }
 }

@@ -3,15 +3,45 @@
 namespace App\Http\Services;
 
 use App\Http\Resources\MovieResource;
+use App\Models\Like;
+use App\Models\Movie;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Http\Dtos\FilterDto;
 
 class MovieService
 {
 
+
+    public function getLikedAndFavouriteMovies(): \Illuminate\Http\Resources\Json\AnonymousResourceCollection
+    {
+        $userId = Auth::id();
+
+        $movies = Movie::query()
+            ->join('movie_genre', 'movies.id', '=', 'movie_genre.movie_id')
+            ->join('genres', 'movie_genre.genre_id', '=', 'genres.id')
+            ->whereIn('genres.id', function ($query) use ($userId) {
+                $query->select('movie_genre.genre_id')
+                    ->distinct()
+                    ->from('movie_genre')
+                    ->join('likes', 'movie_genre.movie_id', '=', 'likes.movie_id')
+                    ->where('likes.user_id', $userId);
+            })
+            ->whereNotIn('movies.id', function ($query) use ($userId) {
+                $query->select('movie_id')
+                    ->from('likes')
+                    ->where('user_id', $userId);
+            })
+            ->select('movies.*')
+            ->orderBy('movies.votes', 'desc')
+            ->limit(10)
+            ->get();
+
+        return MovieResource::collection($movies);
+    }
 
     /**
      * @param Collection $movies
@@ -96,6 +126,11 @@ class MovieService
         if (!$movie) {
             return response()->json(['message' => 'Movie not found'], 404);
         }
+
+        $movie->isLiked = Like::where([
+            'movie_id' => $movie->id,
+            'user_id' => Auth::id()
+        ])->exists();
 
         $movie->comments = new Collection();
         if (!empty($movie->comments_list)) {

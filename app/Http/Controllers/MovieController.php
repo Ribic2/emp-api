@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Dtos\FilterDto;
 use App\Http\Resources\MovieResource;
 use App\Http\Services\MovieService;
+use App\Models\Like;
 use App\Models\LikeAndFavourite;
 use App\Models\Movie;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,12 @@ class MovieController extends Controller
         public MovieService $movieService
     )
     {
+    }
+
+    public function getRecommendedMovies(): JsonResponse
+    {
+
+        return response()->json($this->movieService->getLikedAndFavouriteMovies());
     }
 
 
@@ -51,49 +58,26 @@ class MovieController extends Controller
 
     public function like(int $id): JsonResponse
     {
-        return $this->toggleAction($id, 'like');
-    }
 
-    public function favourite(int $id): JsonResponse
-    {
-        return $this->toggleAction($id, 'favourite');
-    }
+        $isLiked = Like::where([
+            'movie_id' => $id,
+            'user_id' => Auth::id()
+        ]);
 
-    /**
-     * @param $movieId
-     * @param $actionType
-     * @return JsonResponse
-     */
-    private function toggleAction($movieId, $actionType): JsonResponse
-    {
-        $userId = Auth::id();
-
-        if (!$userId) {
-            return response()->json(['message' => 'Unauthorized'], 401);
+        if($isLiked->exists()){
+            $isLiked->delete();
         }
 
-        $movie = Movie::find($movieId);
-        if (!$movie) {
-            return response()->json(['message' => 'Movie not found'], 404);
-        }
-
-        $actionEnum = $actionType === 'like' ? 1 : 2;
-
-        $action = LikeAndFavourite::where('user_id', $userId)
-            ->where('movie_id', $movieId)
-            ->where('action_type', $actionEnum)
-            ->first();
-
-        if ($action) {
-            $action->delete();
-            return response()->json($action);
-        } else {
-            $likeAndFavourite = LikeAndFavourite::create([
-                'user_id' => $userId,
-                'movie_id' => $movieId,
-                'action_type' => $actionEnum,
+        else{
+            Like::create([
+                'movie_id' => $id,
+                'user_id' => Auth::id()
             ]);
-            return response()->json($likeAndFavourite);
         }
+        return response()->json([
+            'status' => $isLiked->exists()
+        ]);
     }
+
+
 }

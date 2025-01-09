@@ -15,10 +15,10 @@ Route::middleware('auth:api')->group(function (){
 
     Route::prefix('/movie')->group(function (){
         Route::get('/', [MovieController::class, 'movies']);
+        Route::get('/recommended', [MovieController::class, 'getRecommendedMovies']);
         Route::get('/filter', [FilterController::class, 'getFilterData']);
         Route::get('/{id}', [MovieController::class, 'movie']);
         Route::post('/{id}/like', [MovieController::class, 'like']);
-        Route::post('/{id}/favourite', [MovieController::class, 'favourite']);
         Route::post('/comment', [CommentController::class, 'addComment']);
     });
 });
